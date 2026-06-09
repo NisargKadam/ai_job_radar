@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Env / secrets
+.env
+*.local
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Playwright persistent session (contains your logged-in LinkedIn session — never commit)
+backend/.user-data/
+backend/playwright-session/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.log
