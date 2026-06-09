@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import candidates, health, linkedin, runs, send, settings
+from app.api import candidates, health, history, linkedin, runs, send, settings
 from app.db.session import init_db
 
 
@@ -32,6 +32,7 @@ def create_app() -> FastAPI:
     app.include_router(runs.router)
     app.include_router(candidates.router)
     app.include_router(send.router)
+    app.include_router(history.router)
     return app
 
 

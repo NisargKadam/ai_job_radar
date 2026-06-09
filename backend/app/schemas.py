@@ -108,3 +108,13 @@ class SendResultOut(BaseModel):
     failed: int
     dry_run: bool
     details: list[str] = []
+
+
+class SentOut(BaseModel):
+    id: int
+    channel: str
+    group_id: str
+    sent_at: datetime
+    message: str
+    role_title: str | None = None
+    company: str | None = None
