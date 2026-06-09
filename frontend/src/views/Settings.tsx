@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { KeyRound, Save, TriangleAlert } from 'lucide-react'
 import { Field, Toggle } from '../components/ui'
 import { api } from '../api'
+import { errMsg } from '../lib'
 import type { Settings as S } from '../types'
 
 export function Settings({ onSaved }: { onSaved: () => void }) {
@@ -42,7 +43,7 @@ export function Settings({ onSaved }: { onSaved: () => void }) {
       setNotice({ kind: 'ok', text: 'Settings saved.' })
       onSaved()
     } catch (e) {
-      setNotice({ kind: 'err', text: e instanceof Error ? e.message : String(e) })
+      setNotice({ kind: 'err', text: errMsg(e) })
     } finally {
       setSaving(false)
     }
@@ -54,7 +55,7 @@ export function Settings({ onSaved }: { onSaved: () => void }) {
       const r = await api.reauth()
       setReauthMsg(r.message)
     } catch (e) {
-      setReauthMsg(e instanceof Error ? e.message : String(e))
+      setReauthMsg(errMsg(e))
     }
   }
 

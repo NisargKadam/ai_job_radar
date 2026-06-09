@@ -7,6 +7,7 @@ footprint low. Automating LinkedIn violates its User Agreement — use sparingly
 """
 import os
 import random
+import threading
 import time
 from urllib.parse import quote
 
@@ -14,6 +15,14 @@ from playwright.sync_api import sync_playwright
 
 from app.config import config
 from app.schemas import Post
+
+# Only one component may drive the persistent Chromium profile at a time —
+# a scrape run and a manual re-auth would otherwise collide on the user-data-dir.
+_browser_lock = threading.Lock()
+
+
+class BrowserBusyError(RuntimeError):
+    pass
 
 FEED_URL = "https://www.linkedin.com/feed/"
 LOGIN_URL = "https://www.linkedin.com/login"
@@ -54,15 +63,23 @@ class LinkedInScraper:
         self._ctx = None
 
     def __enter__(self) -> "LinkedInScraper":
-        os.makedirs(config.aijr_user_data_dir, exist_ok=True)
-        self._pw = sync_playwright().start()
-        self._ctx = self._pw.chromium.launch_persistent_context(
-            user_data_dir=config.aijr_user_data_dir,
-            headless=False,
-            viewport={"width": 1340, "height": 940},
-            user_agent=USER_AGENT,
-            args=["--disable-blink-features=AutomationControlled"],
-        )
+        if not _browser_lock.acquire(blocking=False):
+            raise BrowserBusyError("browser session busy (another scrape or re-auth is running)")
+        self._locked = True
+        try:
+            os.makedirs(config.aijr_user_data_dir, exist_ok=True)
+            self._pw = sync_playwright().start()
+            self._ctx = self._pw.chromium.launch_persistent_context(
+                user_data_dir=config.aijr_user_data_dir,
+                headless=False,
+                viewport={"width": 1340, "height": 940},
+                user_agent=USER_AGENT,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
+        except Exception:
+            _browser_lock.release()
+            self._locked = False
+            raise
         return self
 
     def __exit__(self, *exc) -> None:
@@ -72,6 +89,9 @@ class LinkedInScraper:
         finally:
             if self._pw:
                 self._pw.stop()
+            if getattr(self, "_locked", False):
+                _browser_lock.release()
+                self._locked = False
 
     # --- internals -------------------------------------------------------
     def _page(self):
@@ -170,29 +190,35 @@ def open_for_login(max_wait_seconds: int = 300) -> None:
     """Open a headful browser at the LinkedIn login page for MANUAL login,
     and keep it open until the user closes it (or the timeout elapses).
     Runs in a worker thread (no event loop) so the sync API is safe."""
-    os.makedirs(config.aijr_user_data_dir, exist_ok=True)
-    with sync_playwright() as pw:
-        ctx = pw.chromium.launch_persistent_context(
-            user_data_dir=config.aijr_user_data_dir,
-            headless=False,
-            viewport={"width": 1340, "height": 940},
-            user_agent=USER_AGENT,
-            args=["--disable-blink-features=AutomationControlled"],
-        )
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
-        try:
-            page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=30000)
-        except Exception:
-            pass
-        start = time.time()
-        while time.time() - start < max_wait_seconds:
+    if not _browser_lock.acquire(blocking=False):
+        print("browser session busy; cannot open login right now")
+        return
+    try:
+        os.makedirs(config.aijr_user_data_dir, exist_ok=True)
+        with sync_playwright() as pw:
+            ctx = pw.chromium.launch_persistent_context(
+                user_data_dir=config.aijr_user_data_dir,
+                headless=False,
+                viewport={"width": 1340, "height": 940},
+                user_agent=USER_AGENT,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
             try:
-                if not ctx.pages:  # user closed the window
-                    break
+                page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=30000)
             except Exception:
-                break
-            time.sleep(1)
-        try:
-            ctx.close()
-        except Exception:
-            pass
+                pass
+            start = time.time()
+            while time.time() - start < max_wait_seconds:
+                try:
+                    if not ctx.pages:  # user closed the window
+                        break
+                except Exception:
+                    break
+                time.sleep(1)
+            try:
+                ctx.close()
+            except Exception:
+                pass
+    finally:
+        _browser_lock.release()

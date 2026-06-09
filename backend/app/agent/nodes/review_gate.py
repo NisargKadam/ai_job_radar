@@ -1,15 +1,27 @@
+from app.agent.nodes import log_event
 from app.agent.state import AgentState
-from app.db.models import Candidate, RunEvent
+from app.db.models import Candidate, Seen
 from app.db.session import SessionLocal
 
 
 def review_gate(state: AgentState) -> dict:
-    """Persist selected candidates as pending (idempotent on permalink).
-    The routing function decides whether to deliver or END."""
+    """Atomically (a) mark every classified permalink in the Seen ledger and
+    (b) persist selected candidates as pending. Doing both in one transaction
+    means a crash here loses nothing — the next run simply re-scans."""
     selected = state.get("selected", [])
+    classified = state.get("classified", [])
     run_id = state.get("run_id")
     created = 0
     with SessionLocal() as s:
+        seen = {p for (p,) in s.query(Seen.permalink).all()}
+
+        # cost-guard ledger for future runs (all classified posts, jobs or not)
+        for c in classified:
+            pl = c["post"].permalink
+            if pl not in seen:
+                s.add(Seen(permalink=pl, first_seen_run_id=run_id))
+                seen.add(pl)
+
         for c in selected:
             post, cls = c["post"], c["cls"]
             if s.query(Candidate).filter_by(permalink=post.permalink).first():
@@ -30,9 +42,9 @@ def review_gate(state: AgentState) -> dict:
                 )
             )
             created += 1
-        if run_id is not None:
-            s.add(RunEvent(run_id=run_id, message=f"review_gate: {created} new candidate(s) queued"))
         s.commit()
+
+    log_event(run_id, f"review_gate: {created} new candidate(s) queued")
     return {}
 
 

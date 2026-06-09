@@ -11,6 +11,8 @@ JOB_ID = "daily_scan"
 
 
 async def _scheduled_run() -> None:
+    if run_manager.is_running:
+        return  # a run is already in progress; skip this tick
     await run_manager.start()
 
 
@@ -25,6 +27,8 @@ def schedule_daily(time_str: str):
         CronTrigger(hour=hour, minute=minute),
         id=JOB_ID,
         replace_existing=True,
+        coalesce=True,
+        max_instances=1,
     )
 
 

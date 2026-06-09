@@ -10,8 +10,9 @@ router = APIRouter(tags=["runs"])
 
 @router.post("/run")
 async def trigger_run() -> dict:
+    was_running = run_manager.is_running
     run_id = await run_manager.start()
-    return {"run_id": run_id, "already_running": run_manager.active_run_id != run_id}
+    return {"run_id": run_id, "already_running": was_running}
 
 
 @router.get("/runs", response_model=list[RunOut])

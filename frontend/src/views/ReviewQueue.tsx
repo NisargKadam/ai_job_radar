@@ -2,27 +2,41 @@ import { useState } from 'react'
 import { CheckCheck, Inbox, RefreshCw } from 'lucide-react'
 import { CandidateCard } from '../components/CandidateCard'
 import { api } from '../api'
-import { usePolling } from '../lib'
+import { errMsg, usePolling } from '../lib'
 
 export function ReviewQueue() {
   const pending = usePolling(() => api.listCandidates('pending'), 4000)
   const [bulkBusy, setBulkBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
 
   const cards = pending.data ?? []
 
   async function approve(id: number) {
-    await api.approve(id)
-    pending.refresh()
+    try {
+      await api.approve(id)
+      setErr(null)
+      pending.refresh()
+    } catch (e) {
+      setErr(errMsg(e))
+    }
   }
   async function reject(id: number) {
-    await api.reject(id)
-    pending.refresh()
+    try {
+      await api.reject(id)
+      setErr(null)
+      pending.refresh()
+    } catch (e) {
+      setErr(errMsg(e))
+    }
   }
   async function bulkApprove() {
     setBulkBusy(true)
     try {
       await api.bulkApprove()
+      setErr(null)
       pending.refresh()
+    } catch (e) {
+      setErr(errMsg(e))
     } finally {
       setBulkBusy(false)
     }
@@ -43,6 +57,12 @@ export function ReviewQueue() {
           </button>
         </div>
       </div>
+
+      {err && (
+        <div className="mono mt-3 text-[12px]" style={{ color: 'var(--color-err)' }}>
+          {err}
+        </div>
+      )}
 
       {cards.length === 0 ? (
         <EmptyState loading={pending.loading} error={pending.error} />

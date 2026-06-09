@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Play, Send } from 'lucide-react'
 import { MetricTile } from '../components/ui'
 import { api } from '../api'
-import { fmtClock, fmtRelative, usePolling } from '../lib'
+import { errMsg, fmtClock, fmtRelative, runStatusColor, usePolling } from '../lib'
 import type { Settings } from '../types'
 import type { ViewKey } from '../components/Sidebar'
 
@@ -31,7 +31,7 @@ export function Dashboard({
       setNotice({ kind: 'ok', text: 'Run started — watch Activity for telemetry.' })
       runs.refresh()
     } catch (e) {
-      setNotice({ kind: 'err', text: e instanceof Error ? e.message : String(e) })
+      setNotice({ kind: 'err', text: errMsg(e) })
     } finally {
       setBusy(null)
     }
@@ -50,7 +50,7 @@ export function Dashboard({
       })
       approved.refresh()
     } catch (e) {
-      setNotice({ kind: 'err', text: e instanceof Error ? e.message : String(e) })
+      setNotice({ kind: 'err', text: errMsg(e) })
     } finally {
       setBusy(null)
     }
@@ -143,14 +143,7 @@ export function Dashboard({
 }
 
 function Row({ k, v, tone }: { k: string; v: string; tone?: string }) {
-  const color =
-    tone === 'error' || tone === 'warn'
-      ? 'var(--color-err)'
-      : tone === 'finished'
-        ? 'var(--color-ok)'
-        : tone === 'running'
-          ? 'var(--color-accent)'
-          : 'var(--color-ink)'
+  const color = tone === 'warn' ? 'var(--color-err)' : runStatusColor(tone ?? '')
   return (
     <div className="flex items-baseline justify-between gap-4">
       <span className="eyebrow">{k}</span>

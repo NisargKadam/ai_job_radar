@@ -2,21 +2,12 @@ import json
 import pathlib
 import time
 
+from app.agent.nodes import log_event
 from app.agent.state import AgentState
-from app.db.models import RunEvent
-from app.db.session import SessionLocal
 from app.schemas import Post
 from app.scraper.linkedin import MAX_SESSION_SECONDS, LinkedInScraper
 
 FIXTURE = pathlib.Path(__file__).resolve().parents[3] / "fixtures" / "sample_posts.json"
-
-
-def _log(run_id, msg: str, level: str = "info") -> None:
-    if run_id is None:
-        return
-    with SessionLocal() as s:
-        s.add(RunEvent(run_id=run_id, level=level, message=msg))
-        s.commit()
 
 
 def ingest(state: AgentState) -> dict:
@@ -26,7 +17,7 @@ def ingest(state: AgentState) -> dict:
 
     if settings.get("fixture_mode"):
         posts = [Post(source="fixture", **p) for p in json.loads(FIXTURE.read_text())]
-        _log(run_id, f"fixture_mode: loaded {len(posts)} posts")
+        log_event(run_id, f"fixture_mode: loaded {len(posts)} posts")
         return {"raw_posts": posts, "errors": errors}
 
     keywords = settings.get("keywords", [])
@@ -35,23 +26,23 @@ def ingest(state: AgentState) -> dict:
         with LinkedInScraper(headless=False) as sc:
             if not sc.is_logged_in():
                 errors.append("not_logged_in")
-                _log(run_id, "Not logged into LinkedIn — open Settings → Re-authenticate.", "error")
+                log_event(run_id, "Not logged into LinkedIn — open Settings → Re-authenticate.", "error")
                 return {"raw_posts": [], "errors": errors}
 
             deadline = time.time() + MAX_SESSION_SECONDS
             for p in sc.scrape_feed(max_scrolls=8, deadline=deadline):
                 posts[p.permalink] = p
-            _log(run_id, f"feed: collected {len(posts)} posts")
+            log_event(run_id, f"feed: collected {len(posts)} posts")
 
             for kw in keywords:
                 if time.time() > deadline:
-                    _log(run_id, "session time cap reached; stopping search", "warn")
+                    log_event(run_id, "session time cap reached; stopping search", "warn")
                     break
                 for p in sc.search_posts(kw, max_scrolls=3, deadline=deadline):
                     posts.setdefault(p.permalink, p)
-            _log(run_id, f"feed+search total: {len(posts)} unique posts")
+            log_event(run_id, f"feed+search total: {len(posts)} unique posts")
     except Exception as e:
         errors.append(f"ingest_failed:{e}")
-        _log(run_id, f"ingest failed: {e}", "error")
+        log_event(run_id, f"ingest failed: {e}", "error")
 
     return {"raw_posts": list(posts.values()), "errors": errors}

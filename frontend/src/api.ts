@@ -36,7 +36,7 @@ export const api = {
   putSettings: (patch: Partial<Settings>) =>
     req<Settings>('/settings', { method: 'PUT', body: JSON.stringify(patch) }),
 
-  triggerRun: () => req<{ run_id: number }>('/run', { method: 'POST' }),
+  triggerRun: () => req<{ run_id: number; already_running: boolean }>('/run', { method: 'POST' }),
   listRuns: () => req<Run[]>('/runs'),
   getRun: (id: number) => req<RunDetail>(`/runs/${id}`),
 

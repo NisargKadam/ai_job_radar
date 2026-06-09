@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import { cn, fmtClock, fmtRelative, usePolling } from '../lib'
+import { cn, fmtClock, fmtRelative, runStatusColor, usePolling } from '../lib'
 
 const LEVEL_COLOR: Record<string, string> = {
   info: 'var(--color-muted)',
@@ -12,9 +12,12 @@ export function Activity() {
   const runs = usePolling(api.listRuns, 3000)
   const [selected, setSelected] = useState<number | null>(null)
 
+  // Auto-select the latest run; also re-select if the current pick ages out of the list.
   useEffect(() => {
-    if (selected === null && runs.data && runs.data.length > 0) {
-      setSelected(runs.data[0].id)
+    if (runs.data && runs.data.length > 0) {
+      if (selected === null || !runs.data.some((r) => r.id === selected)) {
+        setSelected(runs.data[0].id)
+      }
     }
   }, [runs.data, selected])
 
@@ -22,7 +25,8 @@ export function Activity() {
     () => (selected ? api.getRun(selected) : Promise.resolve(null)),
     2000,
   )
-  const run = detail.data
+  // Only show detail that matches the current selection (avoid showing stale data while switching).
+  const run = detail.data && detail.data.id === selected ? detail.data : null
 
   // Fetch immediately when the selected run changes (don't wait for the next tick).
   const refreshDetail = detail.refresh
@@ -43,10 +47,7 @@ export function Activity() {
           >
             <span
               className={cn('dot', r.status === 'running' && 'pulsing')}
-              style={{
-                background:
-                  r.status === 'finished' ? 'var(--color-ok)' : r.status === 'error' ? 'var(--color-err)' : 'var(--color-accent)',
-              }}
+              style={{ background: runStatusColor(r.status) }}
             />
             <span className="mono text-[12px]">run #{r.id}</span>
             <span className="mono ml-auto text-[10px]" style={{ color: 'var(--color-faint)' }}>

@@ -57,9 +57,14 @@ def run_pipeline(run_id: int) -> None:
             run.posts_seen = len(result.get("raw_posts", []))
             run.jobs_found = len(result.get("selected", []))
             errs = result.get("errors", [])
-            run.error = "; ".join(errs) if errs else None
+            # low-yield is an informational notice, not a failure — keep it out of run.error
+            notices = [e for e in errs if e.startswith("low_yield")]
+            real_errors = [e for e in errs if not e.startswith("low_yield")]
+            run.error = "; ".join(real_errors) if real_errors else None
             run.status = "finished"
             run.finished_at = _utcnow()
+            for n in notices:
+                s.add(RunEvent(run_id=run_id, level="warn", message=n))
             s.add(RunEvent(run_id=run_id, message=f"run finished: {run.jobs_found} job(s) from {run.posts_seen} post(s)"))
             s.commit()
     except Exception as e:  # noqa: BLE001

@@ -23,37 +23,28 @@ def _stub(post, keywords, model):
     return Classification(is_job=is_job, relevance_score=0.8 if is_job else 0.1)
 
 
-def test_classify_processes_new_and_records_seen(tmp_path, monkeypatch):
+def test_classify_processes_all_unseen(tmp_path, monkeypatch):
     monkeypatch.setenv("AIJR_DB_URL", f"sqlite:///{tmp_path}/c.db")
     init_db()
     monkeypatch.setattr(cl, "classify_post", _stub)
 
     posts = _load_posts()
-    state = {
-        "raw_posts": posts,
-        "settings": {"keywords": ["AI Engineer"], "ollama_model": "x"},
-        "run_id": 1,
-        "errors": [],
-    }
+    state = {"raw_posts": posts, "settings": {"keywords": ["AI Engineer"], "ollama_model": "x"}, "errors": []}
     out = classify(state)
-
-    assert len(out["classified"]) == len(posts) == 8
-    with SessionLocal() as s:
-        assert s.query(Seen).count() == 8
+    assert len(out["classified"]) == 8
 
 
-def test_classify_skips_already_seen(tmp_path, monkeypatch):
+def test_classify_skips_seen_permalinks(tmp_path, monkeypatch):
     monkeypatch.setenv("AIJR_DB_URL", f"sqlite:///{tmp_path}/c2.db")
     init_db()
     monkeypatch.setattr(cl, "classify_post", _stub)
 
     posts = _load_posts()
-    state = {
-        "raw_posts": posts,
-        "settings": {"keywords": ["AI Engineer"], "ollama_model": "x"},
-        "run_id": 1,
-        "errors": [],
-    }
-    classify(state)  # first pass records all in Seen
-    out2 = classify(state)  # second pass: all already seen
-    assert len(out2["classified"]) == 0
+    # mark the first 3 as already seen (review_gate writes Seen in real runs)
+    with SessionLocal() as s:
+        for p in posts[:3]:
+            s.add(Seen(permalink=p.permalink))
+        s.commit()
+
+    out = classify({"raw_posts": posts, "settings": {"keywords": ["x"], "ollama_model": "x"}, "errors": []})
+    assert len(out["classified"]) == 5

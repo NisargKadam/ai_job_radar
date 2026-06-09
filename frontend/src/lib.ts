@@ -4,6 +4,17 @@ export function cn(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(' ')
 }
 
+export const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
+
+const parseUtc = (iso: string): Date => new Date(iso.endsWith('Z') ? iso : iso + 'Z')
+
+export function runStatusColor(status: string): string {
+  if (status === 'finished') return 'var(--color-ok)'
+  if (status === 'error') return 'var(--color-err)'
+  if (status === 'running') return 'var(--color-accent)'
+  return 'var(--color-ink)'
+}
+
 /** Poll a fetcher on an interval; returns latest data + manual refresh. */
 export function usePolling<T>(fetcher: () => Promise<T>, intervalMs = 3000) {
   const [data, setData] = useState<T | null>(null)
@@ -18,7 +29,7 @@ export function usePolling<T>(fetcher: () => Promise<T>, intervalMs = 3000) {
       setData(d)
       setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(errMsg(e))
     } finally {
       setLoading(false)
     }
@@ -38,7 +49,7 @@ const RELATIVE = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 
 export function fmtRelative(iso: string | null): string {
   if (!iso) return '—'
-  const then = new Date(iso.endsWith('Z') ? iso : iso + 'Z').getTime()
+  const then = parseUtc(iso).getTime()
   const diff = then - Date.now()
   const abs = Math.abs(diff)
   const min = 60_000
@@ -52,7 +63,7 @@ export function fmtRelative(iso: string | null): string {
 
 export function fmtClock(iso: string | null): string {
   if (!iso) return '—'
-  return new Date(iso.endsWith('Z') ? iso : iso + 'Z').toLocaleString([], {
+  return parseUtc(iso).toLocaleString([], {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',

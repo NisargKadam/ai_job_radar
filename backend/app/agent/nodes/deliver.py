@@ -1,18 +1,11 @@
+from app.agent.nodes import log_event
 from app.agent.state import AgentState
-from app.db.models import Candidate, Run, RunEvent, Sent
+from app.db.models import Candidate, Run, Sent
 from app.db.session import SessionLocal
 from app.delivery.base import get_channel
 from app.delivery.formatting import format_digest, format_individual
 from app.schemas import CandidateOut, SendResultOut
 from app.settings_service import get_settings_dict
-
-
-def _log(run_id, msg: str, level: str = "info") -> None:
-    if run_id is None:
-        return
-    with SessionLocal() as s:
-        s.add(RunEvent(run_id=run_id, level=level, message=msg))
-        s.commit()
 
 
 def _build_units(cands: list[CandidateOut], individual: bool):
@@ -36,7 +29,7 @@ def _dispatch(cands, ids, settings, dry, run_id) -> SendResultOut:
                 details.append(f"[dry-run] would send [{label}] -> {g}")
         details.append("----- message preview -----")
         details.append(units[0][1])
-        _log(run_id, f"[dry-run] would send {len(units)} message(s) to {len(group_ids)} group(s)")
+        log_event(run_id, f"[dry-run] would send {len(units)} message(s) to {len(group_ids)} group(s)")
         return SendResultOut(sent=0, failed=0, dry_run=True, details=details)
 
     if not group_ids:
@@ -61,7 +54,7 @@ def _dispatch(cands, ids, settings, dry, run_id) -> SendResultOut:
                 if row:
                     row.status = "sent"
         s.commit()
-    _log(run_id, f"delivered: sent={sent} failed={failed}")
+    log_event(run_id, f"delivered: sent={sent} failed={failed}")
     return SendResultOut(sent=sent, failed=failed, dry_run=False, details=details)
 
 
@@ -89,7 +82,8 @@ def deliver(state: AgentState) -> dict:
         with SessionLocal() as s:
             run = s.get(Run, run_id)
             if run:
-                run.sent_count = result.sent
+                # count jobs delivered, not raw (group × message) send operations
+                run.sent_count = len(ids) if result.sent > 0 else 0
                 s.commit()
     return {}
 

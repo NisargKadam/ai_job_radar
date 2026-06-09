@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { RadarMark } from './RadarMark'
 import { StatusPill } from './ui'
 import { fmtDuration, msUntilNext, useTick } from '../lib'
@@ -24,13 +23,9 @@ export function TopBar({
   activeRun: Run | null
   settings: Settings | null
 }) {
-  useTick(1000)
+  useTick(1000) // re-render every second to tick the countdown
   const { title, eyebrow } = TITLES[view]
-  const countdown = useMemo(
-    () => (settings ? fmtDuration(msUntilNext(settings.schedule_time)) : '—'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [settings, Date.now()],
-  )
+  const countdown = settings ? fmtDuration(msUntilNext(settings.schedule_time)) : '—'
 
   const running = !!activeRun
 
