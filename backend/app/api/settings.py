@@ -13,4 +13,9 @@ def read_settings() -> SettingsOut:
 
 @router.put("", response_model=SettingsOut)
 def write_settings(patch: SettingsIn) -> SettingsOut:
-    return update_settings(patch)
+    saved = update_settings(patch)
+    if patch.schedule_time is not None:
+        from app.scheduler import reschedule
+
+        reschedule(saved.schedule_time)
+    return saved

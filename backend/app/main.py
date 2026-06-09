@@ -10,8 +10,11 @@ from app.db.session import init_db
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    # scheduler is started here in Milestone 7
+    from app.scheduler import start_scheduler, stop_scheduler
+
+    start_scheduler()
     yield
+    stop_scheduler()
 
 
 def create_app() -> FastAPI:

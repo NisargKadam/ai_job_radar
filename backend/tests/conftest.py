@@ -8,3 +8,6 @@ _tmp = pathlib.Path(tempfile.gettempdir()) / "aijr_pytest.db"
 if _tmp.exists():
     _tmp.unlink()
 os.environ["AIJR_DB_URL"] = f"sqlite:///{_tmp}"
+
+# Don't spin up the APScheduler event-loop job during tests.
+os.environ["AIJR_DISABLE_SCHEDULER"] = "1"
