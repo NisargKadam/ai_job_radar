@@ -35,6 +35,7 @@ class SettingsIn(BaseModel):
     group_ids: list[str] | None = None
     ollama_model: str | None = None
     fixture_mode: bool | None = None
+    send_individual: bool | None = None
 
 
 class SettingsOut(BaseModel):
@@ -49,6 +50,7 @@ class SettingsOut(BaseModel):
     group_ids: list[str]
     ollama_model: str
     fixture_mode: bool
+    send_individual: bool
 
 
 class CandidateOut(BaseModel):

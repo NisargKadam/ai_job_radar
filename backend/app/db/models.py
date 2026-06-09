@@ -95,3 +95,4 @@ class SettingsRow(Base):
     group_ids: Mapped[list] = mapped_column(JSON, default=list)
     ollama_model: Mapped[str] = mapped_column(String(128), default="gemma4:12b")
     fixture_mode: Mapped[bool] = mapped_column(Boolean, default=False)
+    send_individual: Mapped[bool] = mapped_column(Boolean, default=False)
